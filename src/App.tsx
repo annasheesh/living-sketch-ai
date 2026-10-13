@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Maximize, Minimize } from 'lucide-react';
 import { CameraMirror } from './components/CameraMirror';
 import { DrawingCanvas } from './components/DrawingCanvas';
-import { GestureHUD } from './components/GestureHUD';
-import { TopBar } from './components/TopBar';
 import { SettingsModal } from './components/SettingsModal';
 import { CreationsDrawer } from './components/CreationsDrawer';
 import { ScreenshotModal } from './components/ScreenshotModal';
@@ -388,7 +386,32 @@ export const App: React.FC = () => {
     setScreenshotUrl(offscreen.toDataURL('image/png'));
   };
 
-  // Global Keyboard Shortcuts (Undo: Ctrl+Z, Redo: Ctrl+Y, Clear: C/Delete, Mirror: M, Pause: Space, Snapshot: S)
+  // Full Screen State & Toggle
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement
+        .requestFullscreen()
+        .then(() => setIsFullscreen(true))
+        .catch(() => {});
+    } else {
+      document
+        .exitFullscreen()
+        .then(() => setIsFullscreen(false))
+        .catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // Global Keyboard Shortcuts (Undo: Ctrl+Z, Redo: Ctrl+Y, Clear: C/Delete, Mirror: M, Pause: Space, Snapshot: S, Full Screen: F)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
@@ -408,6 +431,9 @@ export const App: React.FC = () => {
       } else if (e.key.toLowerCase() === 's') {
         e.preventDefault();
         handleTakeScreenshot();
+      } else if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        toggleFullscreen();
       } else if (e.code === 'Space') {
         e.preventDefault();
         handleTogglePause();
@@ -416,7 +442,7 @@ export const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [settings.mirrorMode]);
+  }, [settings.mirrorMode, toggleFullscreen]);
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black select-none font-['Plus_Jakarta_Sans',sans-serif]">
@@ -460,26 +486,21 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* LAYER 6: Interface Controls & HUD */}
-      {/* Top Bar with Live Mirror Status and Subtle Top Controls */}
-      <TopBar
-        cameraStatus={cameraStatus}
-        isMirrored={settings.mirrorMode}
-        onOpenHelp={() => setIsHelpOpen(true)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        livingEntitiesCount={livingEntities.length}
-        onOpenCreations={() => setIsCreationsOpen(v => !v)}
-        onTakeScreenshot={handleTakeScreenshot}
-      />
-
-      {/* Gesture Status HUD & Air Drawing Toggle */}
-      <GestureHUD
-        trackingState={trackingState}
-        settings={settings}
-        onToggleAirDrawing={() =>
-          handleUpdateSettings({ airDrawingEnabled: !settings.airDrawingEnabled })
-        }
-      />
+      {/* ONLY OPTION: Full Screen Toggle Button */}
+      <button
+        onClick={toggleFullscreen}
+        title={isFullscreen ? 'Exit Full Screen (F)' : 'Enter Full Screen (F)'}
+        className="absolute top-4 right-4 z-30 flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-slate-900/60 hover:bg-slate-900/90 backdrop-blur-xl border border-white/10 hover:border-cyan-400/50 text-slate-200 hover:text-white transition-all shadow-xl cursor-pointer pointer-events-auto group"
+      >
+        {isFullscreen ? (
+          <Minimize className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+        ) : (
+          <Maximize className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+        )}
+        <span className="text-xs font-semibold tracking-wide">
+          {isFullscreen ? 'Exit Full Screen' : 'Full Screen'}
+        </span>
+      </button>
 
       {/* Settings Modal */}
       <SettingsModal
