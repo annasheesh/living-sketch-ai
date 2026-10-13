@@ -25,7 +25,6 @@ interface ToolbarProps {
   onUndo: () => void;
   onRedo: () => void;
   onClear: () => void;
-  onBringToLife: () => void;
   onToggleMirror: () => void;
   onTogglePause: () => void;
   onOpenBrushPicker: () => void;
@@ -45,7 +44,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onUndo,
   onRedo,
   onClear,
-  onBringToLife,
   onToggleMirror,
   onTogglePause,
   onOpenBrushPicker,
@@ -108,21 +106,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         }`}
       >
         <Trash2 className="w-4 h-4" />
-      </button>
-
-      {/* CRITICAL FEATURE BUTTON: BRING MY DRAWING TO LIFE */}
-      <button
-        onClick={onBringToLife}
-        disabled={!hasStrokes}
-        title={hasStrokes ? 'Transform sketch into animated character' : 'Draw something on your reflection first!'}
-        className={`relative group px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer shadow-lg ${
-          hasStrokes
-            ? 'bg-gradient-to-r from-amber-400 via-pink-500 to-cyan-500 hover:from-amber-300 hover:to-cyan-400 text-white shadow-pink-500/30 animate-pulse'
-            : 'bg-slate-800/80 text-slate-500 border border-slate-700/50 cursor-not-allowed'
-        }`}
-      >
-        <Sparkles className="w-4 h-4 fill-current" />
-        <span className="font-['Outfit']">Bring My Drawing to Life</span>
       </button>
 
       {/* Living Creations Counter / Drawer */}

@@ -117,4 +117,6 @@ export interface AppSettings {
   showGestureHUD: boolean;
   soundEffects: boolean;
   glowStrength: number;
+  autoBringToLife: boolean;
+  autoBringToLifeDelay: number;
 }

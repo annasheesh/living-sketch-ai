@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Sparkles } from 'lucide-react';
 import { CameraMirror } from './components/CameraMirror';
 import { DrawingCanvas } from './components/DrawingCanvas';
 import { GestureHUD } from './components/GestureHUD';
 import { Toolbar } from './components/Toolbar';
 import { TopBar } from './components/TopBar';
 import { BrushPicker } from './components/BrushPicker';
-import { LivingSketchModal } from './components/LivingSketchModal';
 import { SettingsModal } from './components/SettingsModal';
 import { CreationsDrawer } from './components/CreationsDrawer';
 import { ScreenshotModal } from './components/ScreenshotModal';
@@ -39,7 +39,9 @@ export const App: React.FC = () => {
     showLandmarkSkeleton: false,
     showGestureHUD: true,
     soundEffects: true,
-    glowStrength: 1.0
+    glowStrength: 1.0,
+    autoBringToLife: true,
+    autoBringToLifeDelay: 1.2
   });
 
   // Camera & Tracking State
@@ -58,9 +60,13 @@ export const App: React.FC = () => {
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
 
+  // Auto Bring to Life State & Timer Refs
+  const autoAnimateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [autoCountdown, setAutoCountdown] = useState<number | null>(null);
+  const [recentLifeNotice, setRecentLifeNotice] = useState<string | null>(null);
+
   // Modals & Panels
   const [isBrushPickerOpen, setIsBrushPickerOpen] = useState(false);
-  const [isLivingModalOpen, setIsLivingModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCreationsOpen, setIsCreationsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -87,10 +93,136 @@ export const App: React.FC = () => {
     setIsPaused(animationEngineRef.current.isPaused());
   }, []);
 
-  // Update strokes count trigger
+  // Auto Bring Drawing to Life
+  const autoBringStrokesToLife = useCallback((overrides?: {
+    name?: string;
+    animationType?: AnimationType;
+    speed?: number;
+    aiEffect?: AIEffectType;
+  }) => {
+    if (autoAnimateTimerRef.current) {
+      clearTimeout(autoAnimateTimerRef.current);
+      autoAnimateTimerRef.current = null;
+    }
+    setAutoCountdown(null);
+
+    const strokes = strokeManagerRef.current.getStrokes();
+    if (strokes.length === 0) return;
+
+    const bounds = StrokeManager.calculateBounds(strokes);
+    if (!bounds) return;
+
+    // Convert strokes into local strokes relative to center of mass
+    const relativeStrokes = StrokeManager.normalizeStrokesToCenter(
+      strokes,
+      bounds.centerX,
+      bounds.centerY
+    );
+
+    // Auto-detect optimal animation type based on geometry
+    let animationType: AnimationType = overrides?.animationType || 'hover';
+    if (!overrides?.animationType) {
+      const ratio = bounds.width / bounds.height;
+      if (ratio > 1.35) {
+        animationType = 'wings_flap'; // Wide drawing -> wings flapping!
+      } else if (ratio < 0.75) {
+        animationType = 'bouncing'; // Tall drawing -> bouncy jumps!
+      } else if (strokes.length === 1 && strokes[0].points.length > 25) {
+        animationType = 'heartbeat'; // Closed loop / heart -> heartbeat pulse!
+      } else {
+        const pool: AnimationType[] = ['hover', 'orbit', 'bouncing', 'heartbeat'];
+        animationType = pool[Math.floor(Math.random() * pool.length)];
+      }
+    }
+
+    const aiEffects: AIEffectType[] = ['sparkle_dust', 'neon_aura', 'rainbow_trail', 'fire_flame', 'electric'];
+    const aiEffect = overrides?.aiEffect || aiEffects[Math.floor(Math.random() * aiEffects.length)];
+
+    const count = animationEngineRef.current.getEntities().length + 1;
+    const name = overrides?.name || `Living Creation #${count}`;
+
+    const newEntity: LivingEntity = {
+      id: `entity_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name,
+      relativeStrokes,
+      bounds,
+      x: bounds.centerX,
+      y: bounds.centerY,
+      baseX: bounds.centerX,
+      baseY: bounds.centerY,
+      scale: 1.0,
+      rotation: 0,
+      vx: 0,
+      vy: 0,
+      animationType,
+      animationSpeed: overrides?.speed || 1.0,
+      isPaused: false,
+      aiEffect,
+      createdAt: Date.now()
+    };
+
+    animationEngineRef.current.addEntity(newEntity);
+    SoundEffects.playBringToLife();
+
+    // Clear original drawing canvas so user can immediately draw another creation over their reflection!
+    strokeManagerRef.current.clear();
+    setStrokesVersion(v => v + 1);
+    refreshEntities();
+
+    setRecentLifeNotice(`✨ ${name} is alive!`);
+    setTimeout(() => setRecentLifeNotice(null), 2500);
+  }, [refreshEntities]);
+
+  // When user begins drawing a stroke: cancel auto-animate countdown
+  const handleDrawingStart = useCallback(() => {
+    if (autoAnimateTimerRef.current) {
+      clearTimeout(autoAnimateTimerRef.current);
+      autoAnimateTimerRef.current = null;
+    }
+    setAutoCountdown(null);
+  }, []);
+
+  // When user finishes drawing a stroke
   const handleStrokeCompleted = useCallback(() => {
     setStrokesVersion(v => v + 1);
-  }, []);
+
+    if (settings.autoBringToLife) {
+      if (autoAnimateTimerRef.current) {
+        clearTimeout(autoAnimateTimerRef.current);
+      }
+      setAutoCountdown(settings.autoBringToLifeDelay);
+
+      autoAnimateTimerRef.current = setTimeout(() => {
+        autoBringStrokesToLife();
+      }, settings.autoBringToLifeDelay * 1000);
+    }
+  }, [settings.autoBringToLife, settings.autoBringToLifeDelay, autoBringStrokesToLife]);
+
+  // If user opens their palm while there are strokes drawn, trigger immediately
+  useEffect(() => {
+    if (
+      settings.autoBringToLife &&
+      trackingState?.gesture === 'open_palm' &&
+      strokeManagerRef.current.getStrokes().length > 0
+    ) {
+      autoBringStrokesToLife();
+    }
+  }, [trackingState?.gesture, settings.autoBringToLife, autoBringStrokesToLife]);
+
+  // Countdown timer tick
+  useEffect(() => {
+    if (autoCountdown === null || autoCountdown <= 0) return;
+    const interval = setInterval(() => {
+      setAutoCountdown(prev => {
+        if (prev === null || prev <= 0.15) {
+          clearInterval(interval);
+          return null;
+        }
+        return Number((prev - 0.1).toFixed(1));
+      });
+    }, 100);
+    return () => clearInterval(interval);
+  }, [autoCountdown]);
 
   // Initialize and start HandTracker & Camera
   const startCamera = useCallback(async (cameraId?: string) => {
@@ -196,66 +328,6 @@ export const App: React.FC = () => {
     }
   };
 
-  // Bring My Drawing to Life
-  const handleOpenBringToLife = () => {
-    const strokes = strokeManagerRef.current.getStrokes();
-    if (strokes.length === 0) return;
-    setIsLivingModalOpen(true);
-  };
-
-  const handleConfirmAnimate = (config: {
-    name: string;
-    animationType: AnimationType;
-    speed: number;
-    aiEffect: AIEffectType;
-    aiPrompt: string;
-    clearCanvas: boolean;
-  }) => {
-    const strokes = strokeManagerRef.current.getStrokes();
-    if (strokes.length === 0) return;
-
-    const bounds = StrokeManager.calculateBounds(strokes);
-    if (!bounds) return;
-
-    // Convert strokes into local strokes relative to center of mass
-    const relativeStrokes = StrokeManager.normalizeStrokesToCenter(
-      strokes,
-      bounds.centerX,
-      bounds.centerY
-    );
-
-    const newEntity: LivingEntity = {
-      id: `entity_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      name: config.name,
-      relativeStrokes,
-      bounds,
-      x: bounds.centerX,
-      y: bounds.centerY,
-      baseX: bounds.centerX,
-      baseY: bounds.centerY,
-      scale: 1.0,
-      rotation: 0,
-      vx: 0,
-      vy: 0,
-      animationType: config.animationType,
-      animationSpeed: config.speed,
-      isPaused: false,
-      aiPrompt: config.aiPrompt,
-      aiEffect: config.aiEffect,
-      createdAt: Date.now()
-    };
-
-    animationEngineRef.current.addEntity(newEntity);
-    SoundEffects.playBringToLife();
-
-    if (config.clearCanvas) {
-      strokeManagerRef.current.clear();
-      setStrokesVersion(v => v + 1);
-    }
-
-    refreshEntities();
-  };
-
   // Toggle Global Pause / Resume
   const handleTogglePause = () => {
     animationEngineRef.current.togglePause();
@@ -342,9 +414,26 @@ export const App: React.FC = () => {
         particleSystem={particleSystemRef.current}
         trackingState={trackingState}
         settings={settings}
+        onDrawingStart={handleDrawingStart}
         onStrokeCompleted={handleStrokeCompleted}
         onEntityGrabbed={entity => setSelectedEntityId(entity?.id || null)}
       />
+
+      {/* Auto Bring To Life Countdown Indicator */}
+      {autoCountdown !== null && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/90 backdrop-blur-xl border border-cyan-400/60 shadow-xl text-cyan-300 text-xs font-semibold animate-pulse pointer-events-none">
+          <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
+          <span>Bringing to life in {autoCountdown}s...</span>
+        </div>
+      )}
+
+      {/* Success Notification Toast */}
+      {recentLifeNotice && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 px-5 py-2.5 rounded-full bg-emerald-950/90 border border-emerald-400/60 shadow-2xl text-emerald-200 text-xs font-bold shadow-emerald-500/20 pointer-events-none flex items-center gap-2 animate-bounce">
+          <Sparkles className="w-4 h-4 text-emerald-300" />
+          <span>{recentLifeNotice}</span>
+        </div>
+      )}
 
       {/* LAYER 6: Interface Controls & HUD */}
       {/* Top Bar with Live Mirror Status and Help */}
@@ -374,7 +463,6 @@ export const App: React.FC = () => {
         onUndo={handleUndo}
         onRedo={handleRedo}
         onClear={handleClear}
-        onBringToLife={handleOpenBringToLife}
         onToggleMirror={() => handleUpdateSettings({ mirrorMode: !settings.mirrorMode })}
         onTogglePause={handleTogglePause}
         onOpenBrushPicker={() => setIsBrushPickerOpen(v => !v)}
@@ -390,14 +478,6 @@ export const App: React.FC = () => {
         onUpdateSettings={handleUpdateSettings}
         isOpen={isBrushPickerOpen}
         onClose={() => setIsBrushPickerOpen(false)}
-      />
-
-      {/* Bring My Drawing To Life Configuration Modal */}
-      <LivingSketchModal
-        isOpen={isLivingModalOpen}
-        onClose={() => setIsLivingModalOpen(false)}
-        strokesCount={strokeManagerRef.current.getStrokes().length}
-        onConfirmAnimate={handleConfirmAnimate}
       />
 
       {/* Settings Modal */}

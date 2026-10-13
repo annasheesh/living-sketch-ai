@@ -183,6 +183,43 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
           </div>
 
+          {/* Auto Bring To Life Setting */}
+          <div className="py-2 border-t border-slate-800">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <div className="font-medium text-xs text-slate-200">Auto Bring to Life</div>
+                <div className="text-[10px] text-slate-400">Automatically animate sketch when finished</div>
+              </div>
+              <button
+                onClick={() => onUpdateSettings({ autoBringToLife: !settings.autoBringToLife })}
+                className={`p-2 rounded-xl border transition cursor-pointer ${
+                  settings.autoBringToLife
+                    ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50'
+                    : 'bg-slate-800 text-slate-500 border-slate-700'
+                }`}
+              >
+                <Sparkles className="w-4 h-4" />
+              </button>
+            </div>
+            {settings.autoBringToLife && (
+              <div>
+                <div className="flex justify-between text-xs text-slate-400 mb-1">
+                  <span>Pause Delay Before Animating</span>
+                  <span className="font-mono text-cyan-400">{settings.autoBringToLifeDelay.toFixed(1)}s</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2.5"
+                  step="0.1"
+                  value={settings.autoBringToLifeDelay}
+                  onChange={e => onUpdateSettings({ autoBringToLifeDelay: Number(e.target.value) })}
+                  className="w-full accent-cyan-400 cursor-pointer h-1.5 bg-slate-800 rounded-lg appearance-none"
+                />
+              </div>
+            )}
+          </div>
+
           {/* Reset & Clear Creations */}
           <div className="pt-2 border-t border-slate-800">
             <button

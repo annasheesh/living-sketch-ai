@@ -12,6 +12,7 @@ interface DrawingCanvasProps {
   particleSystem: ParticleSystem;
   trackingState: HandTrackingState | null;
   settings: AppSettings;
+  onDrawingStart?: () => void;
   onStrokeCompleted: () => void;
   onEntityGrabbed?: (entity: LivingEntity | null) => void;
 }
@@ -22,6 +23,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   particleSystem,
   trackingState,
   settings,
+  onDrawingStart,
   onStrokeCompleted,
   onEntityGrabbed
 }) => {
@@ -99,6 +101,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       if (isDrawing) {
         if (!wasDrawingRef.current) {
           // Begin new stroke
+          if (onDrawingStart) onDrawingStart();
           strokeManager.beginStroke(
             cursor,
             settings.brushColor,
@@ -301,6 +304,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       return;
     }
 
+    if (onDrawingStart) onDrawingStart();
     strokeManager.beginStroke(pt, settings.brushColor, settings.brushSize, settings.brushType);
     isMouseDownRef.current = true;
   };
