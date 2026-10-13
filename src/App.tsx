@@ -3,9 +3,7 @@ import { Sparkles } from 'lucide-react';
 import { CameraMirror } from './components/CameraMirror';
 import { DrawingCanvas } from './components/DrawingCanvas';
 import { GestureHUD } from './components/GestureHUD';
-import { Toolbar } from './components/Toolbar';
 import { TopBar } from './components/TopBar';
-import { BrushPicker } from './components/BrushPicker';
 import { SettingsModal } from './components/SettingsModal';
 import { CreationsDrawer } from './components/CreationsDrawer';
 import { ScreenshotModal } from './components/ScreenshotModal';
@@ -66,7 +64,6 @@ export const App: React.FC = () => {
   const [recentLifeNotice, setRecentLifeNotice] = useState<string | null>(null);
 
   // Modals & Panels
-  const [isBrushPickerOpen, setIsBrushPickerOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCreationsOpen, setIsCreationsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -391,7 +388,35 @@ export const App: React.FC = () => {
     setScreenshotUrl(offscreen.toDataURL('image/png'));
   };
 
-  const hasStrokes = strokeManagerRef.current.getStrokes().length > 0;
+  // Global Keyboard Shortcuts (Undo: Ctrl+Z, Redo: Ctrl+Y, Clear: C/Delete, Mirror: M, Pause: Space, Snapshot: S)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        handleRedo();
+      } else if (e.key.toLowerCase() === 'c' || e.key === 'Delete') {
+        e.preventDefault();
+        handleClear();
+      } else if (e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        handleUpdateSettings({ mirrorMode: !settings.mirrorMode });
+      } else if (e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleTakeScreenshot();
+      } else if (e.code === 'Space') {
+        e.preventDefault();
+        handleTogglePause();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [settings.mirrorMode]);
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black select-none font-['Plus_Jakarta_Sans',sans-serif]">
@@ -421,7 +446,7 @@ export const App: React.FC = () => {
 
       {/* Auto Bring To Life Countdown Indicator */}
       {autoCountdown !== null && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/90 backdrop-blur-xl border border-cyan-400/60 shadow-xl text-cyan-300 text-xs font-semibold animate-pulse pointer-events-none">
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/90 backdrop-blur-xl border border-cyan-400/60 shadow-xl text-cyan-300 text-xs font-semibold animate-pulse pointer-events-none">
           <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
           <span>Bringing to life in {autoCountdown}s...</span>
         </div>
@@ -436,11 +461,15 @@ export const App: React.FC = () => {
       )}
 
       {/* LAYER 6: Interface Controls & HUD */}
-      {/* Top Bar with Live Mirror Status and Help */}
+      {/* Top Bar with Live Mirror Status and Subtle Top Controls */}
       <TopBar
         cameraStatus={cameraStatus}
         isMirrored={settings.mirrorMode}
         onOpenHelp={() => setIsHelpOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        livingEntitiesCount={livingEntities.length}
+        onOpenCreations={() => setIsCreationsOpen(v => !v)}
+        onTakeScreenshot={handleTakeScreenshot}
       />
 
       {/* Gesture Status HUD & Air Drawing Toggle */}
@@ -450,34 +479,6 @@ export const App: React.FC = () => {
         onToggleAirDrawing={() =>
           handleUpdateSettings({ airDrawingEnabled: !settings.airDrawingEnabled })
         }
-      />
-
-      {/* Bottom Main Floating Toolbar */}
-      <Toolbar
-        settings={settings}
-        canUndo={strokeManagerRef.current.canUndo()}
-        canRedo={strokeManagerRef.current.canRedo()}
-        hasStrokes={hasStrokes}
-        livingEntities={livingEntities}
-        isPaused={isPaused}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        onClear={handleClear}
-        onToggleMirror={() => handleUpdateSettings({ mirrorMode: !settings.mirrorMode })}
-        onTogglePause={handleTogglePause}
-        onOpenBrushPicker={() => setIsBrushPickerOpen(v => !v)}
-        isBrushPickerOpen={isBrushPickerOpen}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenCreations={() => setIsCreationsOpen(v => !v)}
-        onTakeScreenshot={handleTakeScreenshot}
-      />
-
-      {/* Brush & Color Studio Flyout */}
-      <BrushPicker
-        settings={settings}
-        onUpdateSettings={handleUpdateSettings}
-        isOpen={isBrushPickerOpen}
-        onClose={() => setIsBrushPickerOpen(false)}
       />
 
       {/* Settings Modal */}

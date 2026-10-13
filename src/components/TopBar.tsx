@@ -1,16 +1,24 @@
 import React from 'react';
-import { Sparkles, Video, HelpCircle } from 'lucide-react';
+import { HelpCircle, Sliders, Layers, Camera } from 'lucide-react';
 
 interface TopBarProps {
   cameraStatus: string;
   isMirrored: boolean;
   onOpenHelp: () => void;
+  onOpenSettings?: () => void;
+  livingEntitiesCount?: number;
+  onOpenCreations?: () => void;
+  onTakeScreenshot?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
   cameraStatus,
   isMirrored,
-  onOpenHelp
+  onOpenHelp,
+  onOpenSettings,
+  livingEntitiesCount = 0,
+  onOpenCreations,
+  onTakeScreenshot
 }) => {
   return (
     <div className="absolute top-4 right-4 z-20 flex items-center gap-2 pointer-events-auto">
@@ -34,6 +42,40 @@ export const TopBar: React.FC<TopBarProps> = ({
           </span>
         )}
       </div>
+
+      {/* Living Creations count badge if any */}
+      {livingEntitiesCount > 0 && onOpenCreations && (
+        <button
+          onClick={onOpenCreations}
+          title="Living Creations"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-indigo-950/80 backdrop-blur-xl border border-indigo-500/40 text-indigo-300 hover:text-white transition cursor-pointer shadow-lg text-xs font-semibold"
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>{livingEntitiesCount}</span>
+        </button>
+      )}
+
+      {/* Screenshot / Snapshot icon */}
+      {onTakeScreenshot && (
+        <button
+          onClick={onTakeScreenshot}
+          title="Take Snapshot (S)"
+          className="p-2 rounded-xl bg-slate-900/80 backdrop-blur-xl border border-slate-700/60 text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer shadow-lg"
+        >
+          <Camera className="w-4 h-4" />
+        </button>
+      )}
+
+      {/* Settings Modal */}
+      {onOpenSettings && (
+        <button
+          onClick={onOpenSettings}
+          title="Settings"
+          className="p-2 rounded-xl bg-slate-900/80 backdrop-blur-xl border border-slate-700/60 text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer shadow-lg"
+        >
+          <Sliders className="w-4 h-4" />
+        </button>
+      )}
 
       {/* Help & Guide Button */}
       <button
